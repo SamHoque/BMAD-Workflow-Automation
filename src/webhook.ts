@@ -1,5 +1,6 @@
 import path from 'path';
 import { checkGitPushStatus, type GitPushStatus, type GitStatusInfo } from './git.js';
+import { BMAD_COMMANDS } from './constants.js';
 
 interface CommandAnalytics {
     command: string;
@@ -62,7 +63,7 @@ async function sendStoryWebhook(storyAnalytics: StoryAnalytics): Promise<void> {
     }
     
     // Get commit message from the commands
-    const commitCommand = storyAnalytics.commands.find(cmd => cmd.command === '/commit');
+    const commitCommand = storyAnalytics.commands.find(cmd => cmd.command === BMAD_COMMANDS.COMMIT);
     const commitMessage = commitCommand?.commitMessage || 'No commit message found';
     
     const commandFields: EmbedField[] = storyAnalytics.commands.map((cmd) => ({

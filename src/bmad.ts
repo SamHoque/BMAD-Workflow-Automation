@@ -2,6 +2,7 @@ import { sendMessage, type ClaudeResult } from './claude.js';
 import { sendStoryWebhook, type CommandAnalytics } from './webhook.js';
 import { getGitStatus, hasUncommittedChanges } from './git.js';
 import { findStoryByStatus, updateStoryStatus, getStoryWithTasks, getNextTask, type StoryInfo, type Task } from './markdown.js';
+import { BMAD_COMMANDS, COMMAND_TYPES } from './constants.js';
 
 interface WorkflowAnalytics {
     commands: CommandAnalytics[];
@@ -44,10 +45,10 @@ class BMADWorkflow {
             const nextTask = getNextTask(approvedStory.tasks);
             if (nextTask) {
                 console.log(`Developing task ${nextTask.id}: ${nextTask.name}`);
-                const result = await sendMessage(`/BMad:agents:dev *develop task ${nextTask.id} from story ${approvedStory.story.name}. Start developing immediately without asking questions. You have access to MCP servers including: context7 (use to retrieve up-to-date library documentation)`, {
+                const result = await sendMessage(BMAD_COMMANDS.DEVELOP_TASK(nextTask.id, approvedStory.story.name), {
                     workingDir: this.projectDir 
                 });
-                this.trackCommand('dev', result);
+                this.trackCommand(COMMAND_TYPES.DEV, result);
                 return true;
             } else {
                 // All tasks completed, move to Ready for Review
@@ -61,15 +62,15 @@ class BMADWorkflow {
         story = findStoryByStatus(this.projectDir, 'Ready for Review');
         if (story) {
             console.log(`QA reviewing: ${story.name}`);
-            const result = await sendMessage(`/BMad:agents:qa *review ${story.name}`, { 
+            const result = await sendMessage(BMAD_COMMANDS.QA_REVIEW(story.name), { 
                 workingDir: this.projectDir 
             });
-            this.trackCommand('qa', result);
+            this.trackCommand(COMMAND_TYPES.QA, result);
             updateStoryStatus(story.path, story.content, 'Done');
             
             // Commit
-            const commitResult = await sendMessage('/commit', { workingDir: this.projectDir });
-            this.trackCommand('commit', commitResult);
+            const commitResult = await sendMessage(BMAD_COMMANDS.COMMIT, { workingDir: this.projectDir });
+            this.trackCommand(COMMAND_TYPES.COMMIT, commitResult);
             
             // Send webhook
             await sendStoryWebhook({
@@ -88,21 +89,21 @@ class BMADWorkflow {
             // Commit any uncommitted changes before creating a new draft
             if (await hasUncommittedChanges(this.projectDir)) {
                 console.log('Committing changes before creating new draft...');
-                const commitResult = await sendMessage('/commit', { workingDir: this.projectDir });
-                this.trackCommand('commit', commitResult);
+                const commitResult = await sendMessage(BMAD_COMMANDS.COMMIT, { workingDir: this.projectDir });
+                this.trackCommand(COMMAND_TYPES.COMMIT, commitResult);
             }
             
             console.log('Creating new draft...');
-            const result = await sendMessage('/BMad:agents:sm *draft', { workingDir: this.projectDir });
-            this.trackCommand('draft', result);
+            const result = await sendMessage(BMAD_COMMANDS.CREATE_DRAFT, { workingDir: this.projectDir });
+            this.trackCommand(COMMAND_TYPES.DRAFT, result);
             return true;
         }
 
         // No pending stories -> check for uncommitted changes and commit if any
         if (await hasUncommittedChanges(this.projectDir)) {
             console.log('No pending stories found. Checking for uncommitted changes to commit...');
-            const result = await sendMessage('/commit', { workingDir: this.projectDir });
-            this.trackCommand('commit', result);
+            const result = await sendMessage(BMAD_COMMANDS.COMMIT, { workingDir: this.projectDir });
+            this.trackCommand(COMMAND_TYPES.COMMIT, result);
             console.log('Uncommitted changes committed.');
             return true;
         }
